@@ -4,7 +4,6 @@ using System.Data.Common;
 using System.Linq;
 using System.Runtime.InteropServices;
 
-
 namespace Sudoku;
 
 class Vars
@@ -140,7 +139,6 @@ class Game
 
         return false;
     }
-
 
     // Prints the board to the console using a human-friendly grid layout.
     // Empty cells (0) are shown as blank spaces.
