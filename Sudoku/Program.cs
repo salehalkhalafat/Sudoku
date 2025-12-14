@@ -6,7 +6,9 @@ using System.Runtime.InteropServices;
 
 namespace Sudoku;
 
-class Vars
+
+// Main game logic and helper functions for generating and displaying the board.
+class Game
 {
     // Contains global configuration values and the game boards.
     // - `boardSize`: size of the board (9 for a standard Sudoku)
@@ -14,16 +16,15 @@ class Vars
     // - `emptyCells`: number of cells to remove for the puzzle (not currently used)
     // - `Board`: the playable board the user interacts with
     // - `Solution`: a copy of the generated solution (filled board)
-    public static int boardSize = 9;
-    public static int subGridSize = 3;
-    public static int emptyCells = 50;
-    public int[,] Board = new int[boardSize, boardSize];
-    public int[,] Solution = new int[boardSize, boardSize];
-}
+    static int boardSize = 9;
+    static int subGridSize = 3;
+    static int emptyCells = 50;
+    static int AnswerRow;
+    static int AnswerCol;
+    static int AnswerNum;
+    static int[,] Board = new int[boardSize, boardSize];
+    static int[,] Solution = new int[boardSize, boardSize];
 
-// Main game logic and helper functions for generating and displaying the board.
-class Game
-{
     // Random number generator used across helper methods.
     static Random rand = new Random();
 
@@ -31,12 +32,11 @@ class Game
     // - args: command-line arguments (not used)
     static void Main(string[] args)
     {
-        Vars vars = new Vars();
         Console.WriteLine("Welcome to Sudoku!");
-        BoardSetup(vars.Board, vars.Solution, Vars.emptyCells);
+        BoardSetup(Board, Solution, emptyCells);
         while (true)
         {
-            PlayerInput(vars.Board, vars.Solution);
+            PlayerInput(Board, Solution);
         }
     }
 
@@ -61,9 +61,22 @@ class Game
     // Prints the header row showing column indices and the top grid separator.
     static void HeaderRow()
     {
-        GreenColor();
-        Console.WriteLine("  | 1 2 3 | 4 5 6 | 7 8 9 ");
-        Console.WriteLine("--------------------------");
+        int size = boardSize;
+        int box = subGridSize;
+        for (int i = 0; i < size; i++)
+        {
+            if (i == 0)
+            {
+                Console.Write("  ");
+            }
+            if (i % box == 0)
+            {
+                Column();
+            }
+            Console.Write($"{i + 1} ");
+        }
+        Console.WriteLine();
+        Row();
         Console.ResetColor();
     }
 
@@ -72,38 +85,34 @@ class Game
     {
         GreenColor();
         Console.Write("| ");
-        Console.ResetColor();
     }
     // Prints the horizontal separator used between 3x3 subgrid rows.
     static void Row()
     {
         GreenColor();
         Console.WriteLine("--------------------------");
-        Console.ResetColor();
     }
 
     // Validates whether `number` can be placed at position (row, column)
     // without violating Sudoku constraints (row, column, subgrid).
     private static bool IsValid(int[,] board, int row, int column, int number)
     {
-        int size = Vars.boardSize;
-        int box = Vars.subGridSize;
 
         // Check row
-        for (int c = 0; c < size; c++)
+        for (int c = 0; c < boardSize; c++)
             if (board[row, c] == number)
                 return false;
 
         // Check column
-        for (int r = 0; r < size; r++)
+        for (int r = 0; r < boardSize; r++)
             if (board[r, column] == number)
                 return false;
 
         // Check subgrid
-        int startRow = (row / box) * box;
-        int startCol = (column / box) * box;
-        for (int r = startRow; r < startRow + box; r++)
-            for (int c = startCol; c < startCol + box; c++)
+        int startRow = (row / subGridSize) * subGridSize;
+        int startCol = (column / subGridSize) * subGridSize;
+        for (int r = startRow; r < startRow + subGridSize; r++)
+            for (int c = startCol; c < startCol + subGridSize; c++)
                 if (board[r, c] == number)
                     return false;
 
@@ -114,18 +123,17 @@ class Game
     // and tries numbers 1..boardSize in random order.
     static bool FillBoard(int[,] board, int row = 0, int column = 0)
     {
-        int size = Vars.boardSize;
 
-        if (row == size)
+        if (row == boardSize)
             return true; // finished
 
-        int nextRow = (column == size - 1) ? row + 1 : row;
-        int nextCol = (column == size - 1) ? 0 : column + 1;
+        int nextRow = (column == boardSize - 1) ? row + 1 : row;
+        int nextCol = (column == boardSize - 1) ? 0 : column + 1;
 
         if (board[row, column] != 0)
             return FillBoard(board, nextRow, nextCol);
 
-        var nums = Enumerable.Range(1, size).OrderBy(_ => rand.Next()).ToArray();
+        var nums = Enumerable.Range(1, boardSize).OrderBy(_ => rand.Next()).ToArray();
         foreach (var n in nums)
         {
             if (IsValid(board, row, column, n))
@@ -144,13 +152,14 @@ class Game
     // Empty cells (0) are shown as blank spaces.
     static void PrintBoard(int[,] board)
     {
-        for (int row = 0; row < 9; row++)
+
+        for (int row = 0; row < boardSize; row++)
         {
-            if (row % 3 == 0 && row != 0)
+            if (row % subGridSize == 0 && row != 0)
             {
                 Row();
             }
-            for (int column = 0; column < 9; column++)
+            for (int column = 0; column < boardSize; column++)
             {
                 if (row == 0 && column == 0)
                 {
@@ -162,9 +171,10 @@ class Game
                     Console.Write(row + 1 + " | ");
                     Console.ResetColor();
                 }
-                if (column % 3 == 0 && column != 0)
+                if (column % subGridSize == 0 && column != 0)
                 {
                     Column();
+                    Console.ResetColor();
                 }
                 if (board[row, column] == 0)
                 {
@@ -184,9 +194,11 @@ class Game
     static void PlayerInput(int[,] board, int[,] solution)
     {
         Console.WriteLine("Enter the row (1-9): ");
-        int AnswerRow = Convert.ToInt32(Console.ReadLine());
+        AnswerRow = int.Parse(Console.ReadLine());
+        InputError(AnswerRow);
         Console.WriteLine("Enter the column (1-9): ");
-        int AnswerCol = Convert.ToInt32(Console.ReadLine());
+        AnswerCol = int.Parse(Console.ReadLine());
+        InputError(AnswerCol);
         if (board[AnswerRow - 1, AnswerCol - 1] != 0)
         {
             RedColor();
@@ -196,7 +208,8 @@ class Game
             return;
         }
         Console.WriteLine("Enter the number (1-9): ");
-        int AnswerNum = Convert.ToInt32(Console.ReadLine());
+        AnswerNum = int.Parse(Console.ReadLine());
+        InputError(AnswerNum);
 
         if (AnswerNum == solution[AnswerRow - 1, AnswerCol - 1])
         {
@@ -216,8 +229,8 @@ class Game
 
     static void CopyBoard(int[,] source, int[,] destination)
     {
-        for (int r = 0; r < Vars.boardSize; r++)
-            for (int c = 0; c < Vars.boardSize; c++)
+        for (int r = 0; r < boardSize; r++)
+            for (int c = 0; c < boardSize; c++)
                 destination[r, c] = source[r, c];
     }
     // Fills the entire board with a valid Sudoku solution using backtracking
@@ -225,8 +238,8 @@ class Game
     static void FillGrid(int[,] board)
     {
         // clear board
-        for (int r = 0; r < Vars.boardSize; r++)
-            for (int c = 0; c < Vars.boardSize; c++)
+        for (int r = 0; r < boardSize; r++)
+            for (int c = 0; c < boardSize; c++)
                 board[r, c] = 0;
 
         if (!FillBoard(board))
@@ -238,12 +251,11 @@ class Game
 
     static void EmptyCells(int[,] board, int cellsToRemove)
     {
-        int size = Vars.boardSize;
         int removed = 0;
         while (removed < cellsToRemove)
         {
-            int r = rand.Next(size);
-            int c = rand.Next(size);
+            int r = rand.Next(boardSize);
+            int c = rand.Next(boardSize);
             if (board[r, c] != 0)
             {
                 board[r, c] = 0;
@@ -259,5 +271,20 @@ class Game
         EmptyCells(board, emptycells);
         Console.Clear();
         PrintBoard(board);
+    }
+    static bool InputError(int userinput)
+    {
+        if (userinput >= 1 && userinput <= 9)
+        {
+            return true;
+        }
+        else
+        {
+            RedColor();
+            Console.WriteLine("Invalid input. Please enter numbers between 1 and 9.");
+            Console.ResetColor();
+            PlayerInput(Board, Solution);
+            return false;
+        }
     }
 }
